@@ -2,23 +2,20 @@ package org.dexflex.entwined;
 
 import net.fabricmc.api.ModInitializer;
 
+import net.minecraft.util.Identifier;
+import net.minecraft.util.registry.Registry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Entwined implements ModInitializer {
 	public static final String MOD_ID = "entwined";
 
-	// This logger is used to write text to the console and the log file.
-	// It is considered best practice to use your mod id as the logger's name.
-	// That way, it's clear which mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
 	@Override
 	public void onInitialize() {
-		// This code runs as soon as Minecraft is in a mod-load-ready state.
-		// However, some things (like resources) may still be uninitialized.
-		// Proceed with mild caution.
-
-		LOGGER.info("Hello Fabric world!");
+		Registry.register(Registry.PARTICLE_TYPE, new Identifier(MOD_ID, "vine_base"), ModParticles.VINE_BASE);
+		Registry.register(Registry.PARTICLE_TYPE, new Identifier(MOD_ID, "dead_vine"), ModParticles.DEAD_VINE);
+		Registry.register(Registry.PARTICLE_TYPE, new Identifier(MOD_ID, "vine_leaf"), ModParticles.VINE_LEAF);
 	}
 }
