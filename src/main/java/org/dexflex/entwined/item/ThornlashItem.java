@@ -1,56 +1,96 @@
 package org.dexflex.entwined.item;
 
+import net.minecraft.entity.MarkerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemUsageContext;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
+import net.minecraft.world.RaycastContext.FluidHandling;
+import net.minecraft.world.RaycastContext.ShapeType;
 import net.minecraft.world.World;
-import org.dexflex.entwined.entity.ModEntities;
-import org.dexflex.entwined.entity.VineSnareEntity;
-
+import org.dexflex.entwined.ModParticles;
+import org.dexflex.entwined.VineMarkerManager;
 public class ThornlashItem extends Item {
+
+    private static final int MAX_DISTANCE = 128;
+    private static final int COOLDOWN_TICKS = 0;
+
     public ThornlashItem(Settings settings) {
         super(settings);
     }
 
     @Override
-    public ActionResult useOnBlock(ItemUsageContext context) {
-        World world = context.getWorld();
-        if (world.isClient) return ActionResult.SUCCESS;
+    public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
+        ItemStack stack = user.getStackInHand(hand);
 
-        PlayerEntity player = context.getPlayer();
+        if (world.isClient) {
+            // Client: do nothing here (particles handled by server-to-client packets or world)
+            return TypedActionResult.success(stack);
+        }
 
-        // Raycast from player eyes forward to max distance (say 10 blocks)
-        Vec3d eyePos = player.getEyePos();
-        Vec3d lookVec = player.getRotationVec(1.0f);
-        double maxDistance = 10.0;
-        Vec3d endPos = eyePos.add(lookVec.multiply(maxDistance));
+        // Server side:
 
-        BlockHitResult hit = world.raycast(
-                new RaycastContext(eyePos, endPos, RaycastContext.ShapeType.COLLIDER,
-                        RaycastContext.FluidHandling.NONE, player)
+        if (user.getItemCooldownManager().isCoolingDown(this)) {
+            return TypedActionResult.fail(stack);
+        }
+
+        // Raycast from eyes forward, 128 blocks max distance
+        Vec3d eyePos = user.getEyePos();
+        Vec3d lookVec = user.getRotationVec(1.0f);
+        Vec3d endPos = eyePos.add(lookVec.multiply(MAX_DISTANCE));
+
+        BlockHitResult raycastResult = world.raycast(
+                new RaycastContext(eyePos, endPos, ShapeType.COLLIDER, FluidHandling.NONE, user)
         );
 
-        if (hit.getType() == HitResult.Type.BLOCK && world.getBlockState(hit.getBlockPos()).isSolidBlock(world, hit.getBlockPos())) {
+        if (raycastResult.getType() == BlockHitResult.Type.BLOCK) {
+            BlockPos pos = raycastResult.getBlockPos().up();
+            MarkerEntity marker = new MarkerEntity(net.minecraft.entity.EntityType.MARKER, world);
+
+            double x = pos.getX();
+            double y = pos.getY();
+            double z = pos.getZ();
+
+            marker.updatePosition(x, y, z);
+
             if (world instanceof ServerWorld serverWorld) {
-                VineSnareEntity vine = new VineSnareEntity(ModEntities.VINE_SNARE_ENTITY, world);
-                BlockPos targetPos = hit.getBlockPos().up(); // Spawn at block top surface (or tweak)
-                vine.setPosition(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5);
-                vine.setTargetPlayer(player); // For now target closest player or user himself; later find nearest enemy
-                serverWorld.spawnEntity(vine);
+                serverWorld.spawnEntity(marker);
 
-                // Optionally consume item durability or apply cooldown here...
+                // Register the marker to the manager with the owner UUID and initial data
+                VineMarkerManager.getInstance().addVine(marker, user.getUuid());
 
-                return ActionResult.SUCCESS;
+                // Consume item and cooldown
+                if (!user.isCreative()) {
+                    stack.decrement(1);
+                }
+                user.getItemCooldownManager().set(this, COOLDOWN_TICKS);
+
+                // Spawn vine leaf particles along ray
+                VineMarkerManager.spawnVineLeafParticleLine(serverWorld, eyePos, new Vec3d(x, y + 0.5, z));
+
+                return TypedActionResult.success(stack);
             }
         }
 
-        return ActionResult.FAIL;
+        return TypedActionResult.fail(stack);
+    }
+
+    // Helper to spawn vine leaf particle line between two points
+    private void spawnParticleLine(ServerWorld world, Vec3d start, Vec3d end) {
+        final int STEPS = 50;
+        Vec3d diff = end.subtract(start);
+        for (int i = 0; i <= STEPS; i++) {
+            double t = (double) i / STEPS;
+            Vec3d pos = start.add(diff.multiply(t));
+            world.spawnParticles(ModParticles.VINE_LEAF, pos.x, pos.y, pos.z,
+                    1,
+                    0, 0, 0, 0.0); // stationary particle for the effect
+        }
     }
 }

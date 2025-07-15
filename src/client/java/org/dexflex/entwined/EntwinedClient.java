@@ -20,11 +20,13 @@ public class EntwinedClient implements ClientModInitializer {
 		ClientSpriteRegistryCallback.event(SpriteAtlasTexture.PARTICLE_ATLAS_TEXTURE).register((atlasTexture, registry) -> {
 			registry.register(VINE_BASE_TEXTURE);
 			registry.register(DEAD_VINE_TEXTURE);
+			registry.register(DEAD_VINE_TEXTURE);
 			registry.register(VINE_LEAF_TEXTURE);
 		});
 
 		ParticleFactoryRegistry.getInstance().register(ModParticles.VINE_BASE, VineBaseParticle.Factory::new);
 		ParticleFactoryRegistry.getInstance().register(ModParticles.DEAD_VINE, DeadVineParticle.Factory::new);
+		ParticleFactoryRegistry.getInstance().register(ModParticles.DEAD_VINE_SHORT, DeadVineShortParticle.Factory::new);
 		ParticleFactoryRegistry.getInstance().register(ModParticles.VINE_LEAF, VineLeafParticle.Factory::new);
 	}
 
@@ -36,7 +38,7 @@ public class EntwinedClient implements ClientModInitializer {
 								   double velocityX, double velocityY, double velocityZ, SpriteProvider spriteProvider) {
 			super(world, x, y, z, 0, 0, 0);
 			this.spriteProvider = spriteProvider;
-			this.maxAge = 20;
+			this.maxAge = 1;
 			this.gravityStrength = 0f;
 			this.collidesWithWorld = false;
 			this.setSpriteForAge(spriteProvider);
@@ -70,7 +72,7 @@ public class EntwinedClient implements ClientModInitializer {
 		}
 	}
 
-	// Dead vine particle
+	// Long-lived Dead Vine particle (stationary)
 	public static class DeadVineParticle extends SpriteBillboardParticle {
 		private final SpriteProvider spriteProvider;
 
@@ -78,7 +80,7 @@ public class EntwinedClient implements ClientModInitializer {
 								   double velocityX, double velocityY, double velocityZ, SpriteProvider spriteProvider) {
 			super(world, x, y, z, 0, 0, 0);
 			this.spriteProvider = spriteProvider;
-			this.maxAge = 20;
+			this.maxAge = 10000; // very long life
 			this.gravityStrength = 0f;
 			this.collidesWithWorld = false;
 			this.setSpriteForAge(spriteProvider);
@@ -114,6 +116,49 @@ public class EntwinedClient implements ClientModInitializer {
 		}
 	}
 
+	// Short-lived Dead Vine particle (1 tick lifetime)
+	public static class DeadVineShortParticle extends SpriteBillboardParticle {
+		private final SpriteProvider spriteProvider;
+
+		protected DeadVineShortParticle(ClientWorld world, double x, double y, double z,
+										double velocityX, double velocityY, double velocityZ, SpriteProvider spriteProvider) {
+			super(world, x, y, z, velocityX, velocityY, velocityZ);
+			this.spriteProvider = spriteProvider;
+			this.maxAge = 1; // lives only 1 tick (instant)
+			this.gravityStrength = 0f;
+			this.collidesWithWorld = false;
+			this.setSpriteForAge(spriteProvider);
+			this.angle = this.random.nextFloat() * 360.0F;
+			this.prevAngle = this.angle;
+		}
+
+		@Override
+		public ParticleTextureSheet getType() {
+			return ParticleTextureSheet.PARTICLE_SHEET_OPAQUE;
+		}
+
+		@Override
+		public void tick() {
+			super.tick();
+			this.setSpriteForAge(spriteProvider);
+		}
+
+		public static class Factory implements ParticleFactory<DefaultParticleType> {
+			private final SpriteProvider spriteProvider;
+
+			public Factory(SpriteProvider spriteProvider) {
+				this.spriteProvider = spriteProvider;
+			}
+
+			@Override
+			public Particle createParticle(DefaultParticleType parameters, ClientWorld world,
+										   double x, double y, double z,
+										   double velocityX, double velocityY, double velocityZ) {
+				return new DeadVineShortParticle(world, x, y, z, velocityX, velocityY, velocityZ, spriteProvider);
+			}
+		}
+	}
+
 	// Vine leaf particle
 	public static class VineLeafParticle extends SpriteBillboardParticle {
 		private final SpriteProvider spriteProvider;
@@ -122,17 +167,16 @@ public class EntwinedClient implements ClientModInitializer {
 		protected VineLeafParticle(ClientWorld world, double x, double y, double z,
 								   double velocityX, double velocityY, double velocityZ, SpriteProvider spriteProvider) {
 			super(world, x, y, z, velocityX, velocityY, velocityZ);
-			this.angularVelocity = (this.random.nextFloat()*.1f-0.05f)*2;
+			this.angularVelocity = (this.random.nextFloat() * .1f - .05f) * 2;
 			this.spriteProvider = spriteProvider;
-			this.maxAge = this.random.nextInt(25)+75;
+			this.maxAge = this.random.nextInt(25) + 75;
 			this.gravityStrength = 0.1f;
 			this.collidesWithWorld = false;
 			this.setSpriteForAge(spriteProvider);
-			this.scale(this.random.nextFloat() * .5f+.5f);
+			this.scale(this.random.nextFloat() * .5f + .5f);
 			this.angle = this.random.nextFloat() * 360.0F;
 			this.prevAngle = this.angle;
 			this.setVelocity(0, 0, 0);
-
 		}
 
 		@Override

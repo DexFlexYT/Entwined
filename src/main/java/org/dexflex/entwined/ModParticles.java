@@ -6,6 +6,7 @@ import net.minecraft.particle.DefaultParticleType;
 public class ModParticles {
     public static final DefaultParticleType VINE_BASE = FabricParticleTypes.simple();
     public static final DefaultParticleType DEAD_VINE = FabricParticleTypes.simple();
+    public static final DefaultParticleType DEAD_VINE_SHORT = FabricParticleTypes.simple();
     public static final DefaultParticleType VINE_LEAF = FabricParticleTypes.simple();
 
     public static void register() {
